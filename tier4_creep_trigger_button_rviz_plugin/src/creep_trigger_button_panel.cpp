@@ -30,7 +30,7 @@ void CreepTriggerButtonPanel::onInitialize()
   // create publisher
   publisher_ = node_->create_publisher<tier4_mutual_yielding_msgs::msg::CreepTrigger>(
     "/planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/input/"
-    "mot_slowdown_go",
+    "creep_trigger",
     rclcpp::QoS(10));
 }
 
