@@ -25,8 +25,6 @@ void CreepTriggerButtonPanel::onInitialize()
   // get node from display context
   node_ = this->getDisplayContext()->getRosNodeAbstraction().lock()->get_raw_node();
 
-  std::cerr << "creep_trigger_button_panel initialized" << std::endl;
-
   // create publisher
   publisher_ = node_->create_publisher<tier4_mutual_yielding_msgs::msg::CreepTrigger>(
     "/planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/input/"
