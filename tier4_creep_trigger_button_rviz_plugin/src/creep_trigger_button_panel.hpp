@@ -18,6 +18,8 @@ public:
   explicit CreepTriggerButtonPanel(QWidget * parent = nullptr);
   ~CreepTriggerButtonPanel() override = default;
 
+  void onInitialize() override;
+
 protected Q_SLOTS:
   void onButtonClicked();
 
