@@ -21,6 +21,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/CreepTriggerCommand.msg"
   "msg/CreepTriggerResponse.msg"
   "msg/CreepStatus.msg"
+  "msg/CreepStatusArray.msg"
   "srv/CreepTriggerCommand.srv"
   DEPENDENCIES
     builtin_interfaces

@@ -4,8 +4,9 @@
   <name>tier4_creep_guidance_msgs</name>
   <version>0.1.0</version>
   <description>The tier4_creep_guidance_msgs package</description>
-  <maintainer email="your.email@tier4.jp">Maintainer Name</maintainer>
+  <maintainer email="yukinari.hisaki.2@tier4.jp">Yukinari Hisaki</maintainer>
   <license>Apache License 2.0</license>
+  <author email="yukinari.hisaki.2@tier4.jp">Yukinari Hisaki</author>
 
   <buildtool_depend>ament_cmake_auto</buildtool_depend>
 
