@@ -63,4 +63,3 @@ The `tier4_creep_guidance_msgs` package includes message/service definition file
     - `commands` : Array of creep trigger command
   - Members (Response)
     - `responses` : Array of creep trigger response
-
