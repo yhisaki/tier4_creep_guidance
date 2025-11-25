@@ -89,11 +89,11 @@ public:
   void update_state(const int64_t id, const uint8_t state);
 
   /**
-   * @brief Get the current command status for a registered entry
+   * @brief Check if an activation command has been received for a registered entry
    * @param id Unique identifier for the creep guidance entry
-   * @return Command object containing the current activation status
+   * @return True if activation command has been received, false otherwise
    */
-  Command is_activated(const int64_t id) const;
+  bool recieved_activation_command(const int64_t id) const;
 
   /**
    * @brief Publish the current creep status array to the ROS2 topic

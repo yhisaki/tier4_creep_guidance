@@ -144,14 +144,14 @@ void CreepGuidanceInterface::update_command(const int64_t id, const Command & co
   }
 }
 
-Command CreepGuidanceInterface::is_activated(const int64_t id) const
+bool CreepGuidanceInterface::recieved_activation_command(const int64_t id) const
 {
   auto registered = get_registered(id);
   if (registered != registerd_status_.statuses.end()) {
-    return registered->command;
+    return registered->command.type == Command::ACTIVATE;
   }
-  RCLCPP_WARN(logger_, "Failed to get command: id %ld not found, returning default", id);
-  return Command();
+  RCLCPP_WARN(logger_, "Failed to get command: id %ld not found, returning false", id);
+  return false;
 }
 
 void CreepGuidanceInterface::publish_creep_status_array() const
