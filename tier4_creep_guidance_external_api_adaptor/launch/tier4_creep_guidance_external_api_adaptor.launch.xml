@@ -1,0 +1,9 @@
+<launch>
+  <!-- Creep guidance controller -->
+  <group>
+    <push-ros-namespace namespace="autoware_api/external/creep_guidance_controller"/>
+    <node_container pkg="rclcpp_components" exec="component_container_mt" name="container" namespace="" ros_args="--log-level autoware_api.external.creep_guidance_controller.container:=warn">
+      <composable_node pkg="tier4_creep_guidance_external_api_adaptor" plugin="external_api::CreepGuidanceController" name="node"/>
+    </node_container>
+  </group>
+</launch>
