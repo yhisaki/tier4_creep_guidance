@@ -24,7 +24,6 @@
 
 #ifndef Q_MOC_RUN
 // cpp
-#include <memory>
 #include <string>
 // ros
 #include <rclcpp/rclcpp.hpp>
@@ -32,12 +31,17 @@
 // autoware
 #include <tier4_creep_guidance_msgs/msg/creep_status.hpp>
 #include <tier4_creep_guidance_msgs/msg/creep_status_array.hpp>
+#include <tier4_creep_guidance_msgs/srv/creep_trigger_command.hpp>
 #endif
 
 namespace rviz_plugins
 {
 using tier4_creep_guidance_msgs::msg::CreepStatus;
 using tier4_creep_guidance_msgs::msg::CreepStatusArray;
+using tier4_creep_guidance_msgs::msg::Module;
+using tier4_creep_guidance_msgs::msg::State;
+using tier4_creep_guidance_msgs::msg::Command;
+using tier4_creep_guidance_msgs::srv::CreepTriggerCommand;
 
 class CreepGuidancePanel : public rviz_common::Panel
 {
@@ -48,14 +52,24 @@ public:
   void onInitialize() override;
 
 protected:
-  void onCreepStatus(const CreepStatusArray::ConstSharedPtr msg);
+  void on_creep_status(const CreepStatusArray::ConstSharedPtr msg);
 
 private:
+  void on_button_clicked();
+
+  static std::string get_module_name(const Module & module);
+  static std::string get_status_name(const State & state);
+  static std::string get_command_name(const Command & command);
+
   rclcpp::Node::SharedPtr raw_node_;
   rclcpp::Subscription<CreepStatusArray>::SharedPtr sub_creep_status_;
+  rclcpp::Client<CreepTriggerCommand>::SharedPtr cli_creep_trigger_;
+
+  CreepStatusArray::ConstSharedPtr current_status_;
 
   QLabel * status_label_;
   QTableWidget * status_table_;
+  QPushButton * action_button_;
 };
 
 }  // namespace rviz_plugins

@@ -22,6 +22,7 @@
 #include <rviz_common/display_context.hpp>
 
 #include <string>
+#include <thread>
 
 namespace rviz_plugins
 {
@@ -43,14 +44,59 @@ CreepGuidancePanel::CreepGuidancePanel(QWidget * parent) : rviz_common::Panel(pa
   horizontal_header->setSectionResizeMode(QHeaderView::Stretch);
 
   status_table_ = new QTableWidget();
-  status_table_->setColumnCount(3);
-  status_table_->setHorizontalHeaderLabels({"ID", "Module", "State"});
+  status_table_->setColumnCount(4);
+  status_table_->setHorizontalHeaderLabels({"ID", "Module", "State", "Command"});
   status_table_->setVerticalHeader(vertical_header);
   status_table_->setHorizontalHeader(horizontal_header);
 
   v_layout->addWidget(status_table_);
 
+  // Action button
+  action_button_ = new QPushButton("Trigger Creep");
+  connect(action_button_, &QPushButton::clicked, this, &CreepGuidancePanel::on_button_clicked);
+  v_layout->addWidget(action_button_);
+
   setLayout(v_layout);
+}
+
+std::string CreepGuidancePanel::get_module_name(const Module & module)
+{
+  switch (module.type) {
+    case Module::NONE:
+      return "None";
+    case Module::CROSSWALK:
+      return "Crosswalk";
+    case Module::INTERSECTION:
+      return "Intersection";
+    case Module::INTERSECTION_OCCLUSION:
+      return "Intersection Occlusion";
+    default:
+      return "Unknown";
+  }
+}
+
+std::string CreepGuidancePanel::get_status_name(const State & state)
+{
+  switch (state.type) {
+    case State::DEACTIVATED:
+      return "Deactivated";
+    case State::ACTIVATED:
+      return "Activated";
+    default:
+      return "Unknown";
+  }
+}
+
+std::string CreepGuidancePanel::get_command_name(const Command & command)
+{
+  switch (command.type) {
+    case Command::DEACTIVATE:
+      return "Deactivate";
+    case Command::ACTIVATE:
+      return "Activate";
+    default:
+      return "Unknown";
+  }
 }
 
 void CreepGuidancePanel::onInitialize()
@@ -59,11 +105,18 @@ void CreepGuidancePanel::onInitialize()
 
   // TODO: Update topic name as needed
   sub_creep_status_ = raw_node_->create_subscription<CreepStatusArray>(
-    "/creep_guidance/status", 1, std::bind(&CreepGuidancePanel::onCreepStatus, this, _1));
+    "/api/external/get/creep_status", 1, std::bind(&CreepGuidancePanel::on_creep_status, this, _1));
+
+  // Create service client for creep trigger
+  cli_creep_trigger_ =
+    raw_node_->create_client<CreepTriggerCommand>("/api/external/set/creep_trigger_commands");
 }
 
-void CreepGuidancePanel::onCreepStatus(const CreepStatusArray::ConstSharedPtr msg)
+void CreepGuidancePanel::on_creep_status(const CreepStatusArray::ConstSharedPtr msg)
 {
+  // Store current status
+  current_status_ = msg;
+
   status_table_->clearContents();
   status_label_->setText(
     QString::fromStdString("Creep Statuses: " + std::to_string(msg->statuses.size())));
@@ -73,35 +126,101 @@ void CreepGuidancePanel::onCreepStatus(const CreepStatusArray::ConstSharedPtr ms
     return;
   }
 
-  status_table_->setRowCount(msg->statuses.size());
+  status_table_->setRowCount(static_cast<int>(msg->statuses.size()));
 
   int cnt = 0;
-  for ([[maybe_unused]] const auto & status : msg->statuses) {
+  for (const auto & status : msg->statuses) {
     // ID
     {
-      auto label = new QLabel(QString::number(cnt));
+      auto label = new QLabel(QString::number(status.id));
       label->setAlignment(Qt::AlignCenter);
       status_table_->setCellWidget(cnt, 0, label);
     }
 
     // Module
     {
-      auto label = new QLabel(QString::fromStdString("Module"));
+      auto label = new QLabel(QString::fromStdString(get_module_name(status.module)));
       label->setAlignment(Qt::AlignCenter);
       status_table_->setCellWidget(cnt, 1, label);
     }
 
     // State
     {
-      auto label = new QLabel(QString::fromStdString("State"));
+      auto label = new QLabel(QString::fromStdString(get_status_name(status.state)));
       label->setAlignment(Qt::AlignCenter);
       status_table_->setCellWidget(cnt, 2, label);
+    }
+
+    // Command
+    {
+      auto label = new QLabel(QString::fromStdString(get_command_name(status.command)));
+      label->setAlignment(Qt::AlignCenter);
+      status_table_->setCellWidget(cnt, 3, label);
     }
 
     cnt++;
   }
 
   status_table_->update();
+}
+
+void CreepGuidancePanel::on_button_clicked()
+{
+  // Check if current status is available
+  if (!current_status_) {
+    RCLCPP_WARN(raw_node_->get_logger(), "No current status available");
+    return;
+  }
+
+  // Create service request
+  auto request = std::make_shared<CreepTriggerCommand::Request>();
+  request->stamp = raw_node_->now();
+
+  // Add activate commands for all statuses in current_status_
+  for (const auto & status : current_status_->statuses) {
+    tier4_creep_guidance_msgs::msg::CreepTriggerCommand command;
+    command.id = status.id;
+    command.module = status.module;
+    command.command.type = tier4_creep_guidance_msgs::msg::Command::ACTIVATE;
+    request->commands.push_back(command);
+
+    RCLCPP_INFO(
+      raw_node_->get_logger(), "Adding activate command for ID: %ld, Module: %s", status.id,
+      get_module_name(status.module).c_str());
+  }
+
+  if (request->commands.empty()) {
+    RCLCPP_WARN(raw_node_->get_logger(), "No commands to send");
+    return;
+  }
+
+  // Call service asynchronously
+  if (!cli_creep_trigger_->service_is_ready()) {
+    RCLCPP_WARN(raw_node_->get_logger(), "Service is not ready");
+    return;
+  }
+  RCLCPP_INFO(raw_node_->get_logger(), "Service is ready");
+
+  auto result = cli_creep_trigger_->async_send_request(request);
+  auto future = result.future.share();
+
+  // Handle response asynchronously
+  auto callback =
+    [this](const std::shared_future<CreepTriggerCommand::Response::SharedPtr> & future) {
+      const auto & response = future.get();
+      RCLCPP_INFO(
+        raw_node_->get_logger(), "Received response with %zu results", response->responses.size());
+      for (const auto & res : response->responses) {
+        RCLCPP_INFO(
+          raw_node_->get_logger(), "ID: %ld, Module: %d, Success: %d", res.id, res.module.type,
+          res.success);
+      }
+    };
+
+  // Set callback for when response is received
+  std::thread([future = std::move(future), callback = std::move(callback)]() mutable {
+    callback(future);
+  }).detach();
 }
 
 }  // namespace rviz_plugins

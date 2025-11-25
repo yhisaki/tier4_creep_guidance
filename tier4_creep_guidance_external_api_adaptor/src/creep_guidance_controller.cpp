@@ -51,6 +51,7 @@ void align_creep_status_array(std::vector<CreepStatus> & statuses_vector)
 }  // namespace
 
 CreepGuidanceModule::CreepGuidanceModule(rclcpp::Node * node, const std::string & name)
+: logger_(node->get_logger())
 {
   using namespace std::literals::chrono_literals;
   using std::placeholders::_1;
@@ -60,8 +61,12 @@ CreepGuidanceModule::CreepGuidanceModule(rclcpp::Node * node, const std::string 
     "/planning/creep_guidance_status/" + name, rclcpp::QoS(1),
     std::bind(&CreepGuidanceModule::module_callback, this, _1));
 
+  // // Create a reentrant callback group for the service client to avoid deadlock
+  // client_callback_group_ =
+  //   node->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
+
   cli_set_module_ = proxy.create_client<CreepTriggerCommandSrv>(
-    "/planning/creep_trigger_commands/" + name, rmw_qos_profile_services_default);
+    "/planning/creep_guidance_commands/" + name, rmw_qos_profile_services_default);
 }
 
 void CreepGuidanceModule::module_callback(const CreepStatusArray::ConstSharedPtr message)
@@ -78,8 +83,12 @@ void CreepGuidanceModule::call_service(
   CreepTriggerCommandSrv::Request::SharedPtr request,
   const CreepTriggerCommandSrv::Response::SharedPtr & responses)
 {
+  using namespace std::literals::chrono_literals;
+  // Increase timeout to 10 seconds to wait for server response
   const auto [status, resp] = cli_set_module_->call(request);
   if (!tier4_api_utils::is_success(status)) {
+    RCLCPP_ERROR(
+      logger_, "Failed to call service: %s (code: %d)", status.message.c_str(), status.code);
     return;
   }
   responses->responses.insert(
@@ -132,6 +141,7 @@ void CreepGuidanceController::set_creep_trigger(
   const CreepTriggerCommandSrv::Request::SharedPtr requests,
   const CreepTriggerCommandSrv::Response::SharedPtr responses)
 {
+  RCLCPP_INFO(get_logger(), "set_creep_trigger");
   for (tier4_creep_guidance_msgs::msg::CreepTriggerCommand & command : requests->commands) {
     auto request = std::make_shared<CreepTriggerCommandSrv::Request>();
     request->stamp = requests->stamp;

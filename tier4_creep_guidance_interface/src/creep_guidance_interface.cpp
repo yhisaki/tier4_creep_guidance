@@ -49,12 +49,15 @@ CreepGuidanceInterface::CreepGuidanceInterface(rclcpp::Node * node, const std::s
   using std::placeholders::_1;
   using std::placeholders::_2;
 
+  // Create callback group for service
+  callback_group_ = node->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
   // Create service for creep trigger commands
   const std::string service_name = "/planning/creep_guidance_commands/" + name;
   srv_creep_trigger_commands_ = node->create_service<CreepTriggerCommandSrv>(
     service_name,
     std::bind(&CreepGuidanceInterface::on_creep_trigger_command_service, this, _1, _2),
-    rmw_qos_profile_services_default);
+    rmw_qos_profile_services_default, callback_group_);
 
   // Create publisher for creep status array
   const std::string topic_name = "/planning/creep_guidance_status/" + name;
@@ -164,11 +167,10 @@ void CreepGuidanceInterface::on_creep_trigger_command_service(
   const CreepTriggerCommandSrv::Request::SharedPtr request,
   const CreepTriggerCommandSrv::Response::SharedPtr response)
 {
-  RCLCPP_DEBUG(
+  RCLCPP_INFO(
     logger_, "Received creep trigger command service request with %zu commands",
     request->commands.size());
 
-  std::vector<CreepTriggerResponse> responses;
   for (const auto & command : request->commands) {
     if (
       module_ == command.module && get_registered(command.id) != registerd_status_.statuses.end()) {
@@ -196,5 +198,6 @@ void CreepGuidanceInterface::on_creep_trigger_command_service(
       }
     }
   }
+  RCLCPP_INFO(logger_, "Creep trigger command service request processed");
 }
 }  // namespace tier4::creep_guidance_interface

@@ -131,6 +131,7 @@ private:
    */
   std::vector<CreepStatus>::const_iterator get_registered(const int64_t id) const;
 
+  rclcpp::CallbackGroup::SharedPtr callback_group_;  //!< Callback group for service
   rclcpp::Service<CreepTriggerCommandSrv>::SharedPtr srv_creep_trigger_commands_;  //!< Service for receiving creep trigger commands
   rclcpp::Publisher<CreepStatusArray>::SharedPtr pub_creep_status_array_;  //!< Publisher for creep status array
   rclcpp::Clock::SharedPtr clock_;  //!< Clock for timestamping messages

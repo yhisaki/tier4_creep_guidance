@@ -45,7 +45,9 @@ class CreepGuidanceModule
 public:
   std::vector<CreepStatus> module_statuses_;
   rclcpp::Subscription<CreepStatusArray>::SharedPtr module_sub_;
+  rclcpp::CallbackGroup::SharedPtr client_callback_group_;
   tier4_api_utils::Client<CreepTriggerCommandSrv>::SharedPtr cli_set_module_;
+  rclcpp::Logger logger_;
 
   CreepGuidanceModule(rclcpp::Node * node, const std::string & name);
   void module_callback(const CreepStatusArray::ConstSharedPtr message);
