@@ -167,10 +167,6 @@ void CreepGuidanceInterface::on_creep_trigger_command_service(
   const CreepTriggerCommandSrv::Request::SharedPtr request,
   const CreepTriggerCommandSrv::Response::SharedPtr response)
 {
-  RCLCPP_INFO(
-    logger_, "Received creep trigger command service request with %zu commands",
-    request->commands.size());
-
   for (const auto & command : request->commands) {
     if (
       module_ == command.module && get_registered(command.id) != registerd_status_.statuses.end()) {
@@ -198,6 +194,5 @@ void CreepGuidanceInterface::on_creep_trigger_command_service(
       }
     }
   }
-  RCLCPP_INFO(logger_, "Creep trigger command service request processed");
 }
 }  // namespace tier4::creep_guidance_interface

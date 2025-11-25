@@ -44,8 +44,8 @@ CreepGuidancePanel::CreepGuidancePanel(QWidget * parent) : rviz_common::Panel(pa
   horizontal_header->setSectionResizeMode(QHeaderView::Stretch);
 
   status_table_ = new QTableWidget();
-  status_table_->setColumnCount(4);
-  status_table_->setHorizontalHeaderLabels({"ID", "Module", "State", "Command"});
+  status_table_->setColumnCount(6);
+  status_table_->setHorizontalHeaderLabels({"ID", "Module", "State", "Command", "Start Distance", "Finish Distance"});
   status_table_->setVerticalHeader(vertical_header);
   status_table_->setHorizontalHeader(horizontal_header);
 
@@ -103,7 +103,6 @@ void CreepGuidancePanel::onInitialize()
 {
   raw_node_ = this->getDisplayContext()->getRosNodeAbstraction().lock()->get_raw_node();
 
-  // TODO: Update topic name as needed
   sub_creep_status_ = raw_node_->create_subscription<CreepStatusArray>(
     "/api/external/get/creep_status", 1, std::bind(&CreepGuidancePanel::on_creep_status, this, _1));
 
@@ -156,6 +155,20 @@ void CreepGuidancePanel::on_creep_status(const CreepStatusArray::ConstSharedPtr 
       auto label = new QLabel(QString::fromStdString(get_command_name(status.command)));
       label->setAlignment(Qt::AlignCenter);
       status_table_->setCellWidget(cnt, 3, label);
+    }
+
+    // Start Distance
+    {
+      auto label = new QLabel(QString::number(status.start_distance, 'f', 2));
+      label->setAlignment(Qt::AlignCenter);
+      status_table_->setCellWidget(cnt, 4, label);
+    }
+
+    // Finish Distance
+    {
+      auto label = new QLabel(QString::number(status.finish_distance, 'f', 2));
+      label->setAlignment(Qt::AlignCenter);
+      status_table_->setCellWidget(cnt, 5, label);
     }
 
     cnt++;

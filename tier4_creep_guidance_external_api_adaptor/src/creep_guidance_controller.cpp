@@ -141,7 +141,6 @@ void CreepGuidanceController::set_creep_trigger(
   const CreepTriggerCommandSrv::Request::SharedPtr requests,
   const CreepTriggerCommandSrv::Response::SharedPtr responses)
 {
-  RCLCPP_INFO(get_logger(), "set_creep_trigger");
   for (tier4_creep_guidance_msgs::msg::CreepTriggerCommand & command : requests->commands) {
     auto request = std::make_shared<CreepTriggerCommandSrv::Request>();
     request->stamp = requests->stamp;
