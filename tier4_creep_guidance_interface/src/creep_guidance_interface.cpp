@@ -15,56 +15,22 @@
 #include "tier4/creep_guidance_interface/creep_guidance_interface.hpp"
 
 #include <cstdint>
-#include <iomanip>
-#include <sstream>
 #include <string>
 #include <vector>
 
 namespace
 {
-/**
- * @brief Convert UUID to string representation
- * @param uuid The UUID to convert
- * @return Hexadecimal string representation of the UUID
- */
-[[nodiscard]] std::string uuid_to_string(const unique_identifier_msgs::msg::UUID & uuid)
-{
-  std::stringstream ss;
-  ss << std::hex << std::setfill('0');
-  for (const auto byte : uuid.uuid) {
-    ss << std::setw(2) << static_cast<int>(byte);
-  }
-  return ss.str();
-}
-
-/**
- * @brief Convert command type to string representation
- * @param type The command type value
- * @return String representation of the command type
- * @throws std::domain_error if the command type is invalid
- */
-[[nodiscard]] std::string command_to_string(const uint8_t type)
-{
-  switch (type) {
-    case tier4_creep_guidance_msgs::msg::Command::ACTIVATE:
-      return "ACTIVATE";
-    case tier4_creep_guidance_msgs::msg::Command::DEACTIVATE:
-      return "DEACTIVATE";
-    default:
-      throw std::domain_error("Invalid creep guidance command type: " + std::to_string(type));
-  }
-}
 
 using Module = tier4_creep_guidance_msgs::msg::Module;
 
-Module get_module_type(const std::string & module_name)
+Module get_module_type(const std::string & name)
 {
   Module module;
-  if (module_name == "crosswalk") {
+  if (name == "crosswalk") {
     module.type = Module::CROSSWALK;
-  } else if (module_name == "intersection") {
+  } else if (name == "intersection") {
     module.type = Module::INTERSECTION;
-  } else if (module_name == "intersection_occlusion") {
+  } else if (name == "intersection_occlusion") {
     module.type = Module::INTERSECTION_OCCLUSION;
   } else {
     module.type = Module::NONE;
@@ -77,33 +43,145 @@ Module get_module_type(const std::string & module_name)
 namespace tier4::creep_guidance_interface
 {
 
-CreepGuidanceInterface::CreepGuidanceInterface(rclcpp::Node * node, const std::string & module_name)
-: callback_group_(node->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive)),
-  clock_(node->get_clock()),
-  logger_(node->get_logger())
+CreepGuidanceInterface::CreepGuidanceInterface(rclcpp::Node * node, const std::string & name)
+: clock_(node->get_clock()), logger_(node->get_logger())
 {
   using std::placeholders::_1;
   using std::placeholders::_2;
 
   // Create service for creep trigger commands
-  const std::string service_name = "~/" + module_name + "/creep_trigger_commands";
+  const std::string service_name = "~/" + name + "/creep_trigger_commands";
   srv_creep_trigger_commands_ = node->create_service<CreepTriggerCommandSrv>(
     service_name,
     std::bind(&CreepGuidanceInterface::on_creep_trigger_command_service, this, _1, _2),
-    rmw_qos_profile_services_default, callback_group_);
+    rmw_qos_profile_services_default);
 
-  module_ = get_module_type(module_name);
+  // Create publisher for creep status array
+  const std::string topic_name = "~/" + name + "/creep_status_array";
+  pub_creep_status_array_ = node->create_publisher<CreepStatusArray>(topic_name, 1);
+
+  module_ = get_module_type(name);
   RCLCPP_INFO(logger_, "CreepGuidanceInterface initialized with service: %s", service_name.c_str());
+}
+
+void CreepGuidanceInterface::add(const int64_t id)
+{
+  CreepStatus status;
+  status.id = id;
+  status.module = module_;
+  status.state.type = State::DEACTIVATED;
+  status.command.type = Command::DEACTIVATE;
+  status.start_distance = -100000.0;
+  status.finish_distance = -100000.0;
+  registerd_status_.statuses.push_back(status);
+  RCLCPP_DEBUG(logger_, "Added creep guidance entry with id: %ld", id);
+}
+
+std::vector<CreepStatus>::iterator CreepGuidanceInterface::get_registered(const int64_t id)
+{
+  return std::find_if(
+    registerd_status_.statuses.begin(), registerd_status_.statuses.end(),
+    [id](const auto & s) { return s.id == id; });
+}
+
+std::vector<CreepStatus>::const_iterator CreepGuidanceInterface::get_registered(
+  const int64_t id) const
+{
+  return std::find_if(
+    registerd_status_.statuses.begin(), registerd_status_.statuses.end(),
+    [id](const auto & s) { return s.id == id; });
+}
+
+void CreepGuidanceInterface::update_distance(
+  const int64_t id, const double start_distance, const double finish_distance)
+{
+  auto registered = get_registered(id);
+  if (registered != registerd_status_.statuses.end()) {
+    registered->start_distance = static_cast<float>(start_distance);
+    registered->finish_distance = static_cast<float>(finish_distance);
+    RCLCPP_DEBUG(
+      logger_, "Updated distance for id %ld: start=%.2f, finish=%.2f", id, start_distance,
+      finish_distance);
+  } else {
+    RCLCPP_WARN(logger_, "Failed to update distance: id %ld not found", id);
+  }
+}
+
+void CreepGuidanceInterface::update_state(const int64_t id, const uint8_t state)
+{
+  auto registered = get_registered(id);
+  if (registered != registerd_status_.statuses.end()) {
+    registered->state.type = state;
+    RCLCPP_DEBUG(logger_, "Updated state for id %ld: state=%u", id, state);
+  } else {
+    RCLCPP_WARN(logger_, "Failed to update state: id %ld not found", id);
+  }
+}
+
+void CreepGuidanceInterface::update_command(const int64_t id, const Command & command)
+{
+  auto registered = get_registered(id);
+  if (registered != registerd_status_.statuses.end()) {
+    registered->command = command;
+    RCLCPP_DEBUG(logger_, "Updated command for id %ld: command_type=%u", id, command.type);
+  } else {
+    RCLCPP_WARN(logger_, "Failed to update command: id %ld not found", id);
+  }
+}
+
+Command CreepGuidanceInterface::is_activated(const int64_t id) const
+{
+  auto registered = get_registered(id);
+  if (registered != registerd_status_.statuses.end()) {
+    return registered->command;
+  }
+  RCLCPP_WARN(logger_, "Failed to get command: id %ld not found, returning default", id);
+  return Command();
+}
+
+void CreepGuidanceInterface::publish_creep_status_array() const
+{
+  CreepStatusArray status_array = registerd_status_;
+  status_array.stamp = clock_->now();
+  pub_creep_status_array_->publish(status_array);
+  RCLCPP_DEBUG(
+    logger_, "Published creep status array with %zu entries", status_array.statuses.size());
 }
 
 void CreepGuidanceInterface::on_creep_trigger_command_service(
   const CreepTriggerCommandSrv::Request::SharedPtr request,
   const CreepTriggerCommandSrv::Response::SharedPtr response)
 {
-  {
-    (void)response;
-    for (const auto & command : request->commands) {
-      (void)command;
+  RCLCPP_DEBUG(
+    logger_, "Received creep trigger command service request with %zu commands",
+    request->commands.size());
+
+  std::vector<CreepTriggerResponse> responses;
+  for (const auto & command : request->commands) {
+    if (
+      module_ == command.module && get_registered(command.id) != registerd_status_.statuses.end()) {
+      update_command(command.id, command.command);
+      CreepTriggerResponse success;
+      success.id = command.id;
+      success.module = command.module;
+      success.success = true;
+      response->responses.push_back(success);
+      RCLCPP_DEBUG(
+        logger_, "Creep trigger command succeeded: id=%ld, command_type=%u", command.id,
+        command.command.type);
+    } else {
+      CreepTriggerResponse failure;
+      failure.id = command.id;
+      failure.module = command.module;
+      failure.success = false;
+      response->responses.push_back(failure);
+      if (module_ != command.module) {
+        RCLCPP_WARN(
+          logger_, "Creep trigger command failed: id=%ld, module mismatch (expected=%u, got=%u)",
+          command.id, module_.type, command.module.type);
+      } else {
+        RCLCPP_WARN(logger_, "Creep trigger command failed: id=%ld not registered", command.id);
+      }
     }
   }
 }

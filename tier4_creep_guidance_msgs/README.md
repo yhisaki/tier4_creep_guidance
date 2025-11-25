@@ -37,21 +37,21 @@ The `tier4_creep_guidance_msgs` package includes message/service definition file
 - `tier4_creep_guidance_msgs/CreepTriggerCommand`
 
   - Members
-    - `uuid` : Index of requesting target
+    - `id` : Index of requesting target
     - `module` : Module type of requesting target
     - `command` : Command
 
 - `tier4_creep_guidance_msgs/CreepTriggerResponse`
 
   - Members
-    - `uuid` : Index of requesting target
+    - `id` : Index of requesting target
     - `module` : Module type of requesting target
     - `success` : Creep trigger command result
 
 - `tier4_creep_guidance_msgs/CreepStatus`
 
   - Members
-    - `uuid` : Index of requesting target
+    - `id` : Index of requesting target
     - `module` : Module type of requesting target
     - `state` : State of creep trigger
 

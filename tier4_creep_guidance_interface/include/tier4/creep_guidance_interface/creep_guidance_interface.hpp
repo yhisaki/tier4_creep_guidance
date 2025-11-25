@@ -15,19 +15,19 @@
 #ifndef TIER4__CREEP_GUIDANCE_INTERFACE__CREEP_GUIDANCE_INTERFACE_HPP_
 #define TIER4__CREEP_GUIDANCE_INTERFACE__CREEP_GUIDANCE_INTERFACE_HPP_
 
-#include "rclcpp/rclcpp.hpp"
+#include <rclcpp/rclcpp.hpp>
 
 #include <tier4_creep_guidance_msgs/msg/command.hpp>
 #include <tier4_creep_guidance_msgs/msg/creep_status.hpp>
 #include <tier4_creep_guidance_msgs/msg/creep_status_array.hpp>
 #include <tier4_creep_guidance_msgs/msg/creep_trigger_command.hpp>
 #include <tier4_creep_guidance_msgs/msg/creep_trigger_response.hpp>
+#include <tier4_creep_guidance_msgs/msg/detail/command__struct.hpp>
 #include <tier4_creep_guidance_msgs/msg/module.hpp>
 #include <tier4_creep_guidance_msgs/msg/state.hpp>
 #include <tier4_creep_guidance_msgs/srv/creep_trigger_command.hpp>
-#include <unique_identifier_msgs/msg/uuid.hpp>
 
-#include <mutex>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -42,27 +42,96 @@ using tier4_creep_guidance_msgs::msg::CreepTriggerResponse;
 using tier4_creep_guidance_msgs::msg::Module;
 using tier4_creep_guidance_msgs::msg::State;
 using CreepTriggerCommandSrv = tier4_creep_guidance_msgs::srv::CreepTriggerCommand;
-using unique_identifier_msgs::msg::UUID;
 
+/**
+ * @brief Interface for managing creep guidance status and commands
+ *
+ * This class provides an interface for registering, updating, and publishing
+ * creep guidance status information. It handles service requests for triggering
+ * creep commands and maintains the status of registered creep guidance modules.
+ */
 class CreepGuidanceInterface
 {
 public:
-  CreepGuidanceInterface(rclcpp::Node * node, const std::string & module_name);
+  /**
+   * @brief Constructor
+   * @param node Pointer to the ROS2 node
+   * @param name Name of the creep guidance module (e.g., "crosswalk", "intersection")
+   */
+  CreepGuidanceInterface(rclcpp::Node * node, const std::string & name);
+
+  /**
+   * @brief Register a new creep guidance status entry
+   * @param id Unique identifier for the creep guidance entry
+   */
+  void add(const int64_t id);
+
+  /**
+   * @brief Update the distance information for a registered entry
+   * @param id Unique identifier for the creep guidance entry
+   * @param start_distance Distance from the ego vehicle to the start point
+   * @param finish_distance Distance from the ego vehicle to the finish point
+   */
+  void update_distance(const int64_t id, const double start_distance, const double finish_distance);
+
+  /**
+   * @brief Update the state of a registered entry
+   * @param id Unique identifier for the creep guidance entry
+   * @param state New state value to set
+   */
+  void update_state(const int64_t id, const uint8_t state);
+
+  /**
+   * @brief Get the current command status for a registered entry
+   * @param id Unique identifier for the creep guidance entry
+   * @return Command object containing the current activation status
+   */
+  Command is_activated(const int64_t id) const;
+
+  /**
+   * @brief Publish the current creep status array to the ROS2 topic
+   */
+  void publish_creep_status_array() const;
 
 private:
+  /**
+   * @brief Service callback for handling creep trigger commands
+   * @param request Service request containing trigger commands
+   * @param responses Service response containing the result of each command
+   */
   void on_creep_trigger_command_service(
-    const CreepTriggerCommandSrv::Request::SharedPtr request,
+    const std::shared_ptr<CreepTriggerCommandSrv::Request> request,
     const CreepTriggerCommandSrv::Response::SharedPtr responses);
-  void update_status(const std::vector<CreepTriggerCommandMsg> & commands);
 
-  rclcpp::Service<CreepTriggerCommandSrv>::SharedPtr srv_creep_trigger_commands_;
-  rclcpp::CallbackGroup::SharedPtr callback_group_;
-  rclcpp::Clock::SharedPtr clock_;
-  mutable rclcpp::Logger logger_;
+  /**
+   * @brief Update the command for a registered entry
+   * @param id Unique identifier for the creep guidance entry
+   * @param command New command to set
+   */
+  void update_command(const int64_t id, const Command & command);
 
-  CreepStatusArray creep_status_array_;
+  /**
+   * @brief Find the iterator to a registered entry by ID
+   * @param id Unique identifier for the creep guidance entry
+   * @return Iterator to the registered entry, or end() if not found
+   */
+  std::vector<CreepStatus>::iterator get_registered(const int64_t id);
 
-  Module module_;
+  /**
+   * @brief Find the const iterator to a registered entry by ID
+   * @param id Unique identifier for the creep guidance entry
+   * @return Const iterator to the registered entry, or end() if not found
+   */
+  std::vector<CreepStatus>::const_iterator get_registered(const int64_t id) const;
+
+  rclcpp::Service<CreepTriggerCommandSrv>::SharedPtr srv_creep_trigger_commands_;  //!< Service for receiving creep trigger commands
+  rclcpp::Publisher<CreepStatusArray>::SharedPtr pub_creep_status_array_;  //!< Publisher for creep status array
+  rclcpp::Clock::SharedPtr clock_;  //!< Clock for timestamping messages
+  mutable rclcpp::Logger logger_;  //!< Logger for debug and info messages
+
+  CreepStatusArray registerd_status_;  //!< Array of registered creep guidance statuses
+
+  Module module_;  //!< Module type (crosswalk, intersection, etc.)
 };
 
 }  // namespace tier4::creep_guidance_interface
