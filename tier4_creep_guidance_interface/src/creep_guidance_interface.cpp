@@ -50,14 +50,14 @@ CreepGuidanceInterface::CreepGuidanceInterface(rclcpp::Node * node, const std::s
   using std::placeholders::_2;
 
   // Create service for creep trigger commands
-  const std::string service_name = "~/" + name + "/creep_trigger_commands";
+  const std::string service_name = "/planning/creep_guidance_commands/" + name;
   srv_creep_trigger_commands_ = node->create_service<CreepTriggerCommandSrv>(
     service_name,
     std::bind(&CreepGuidanceInterface::on_creep_trigger_command_service, this, _1, _2),
     rmw_qos_profile_services_default);
 
   // Create publisher for creep status array
-  const std::string topic_name = "~/" + name + "/creep_status_array";
+  const std::string topic_name = "/planning/creep_guidance_status/" + name;
   pub_creep_status_array_ = node->create_publisher<CreepStatusArray>(topic_name, 1);
 
   module_ = get_module_type(name);
