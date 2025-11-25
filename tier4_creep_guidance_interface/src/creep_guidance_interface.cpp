@@ -77,6 +77,18 @@ void CreepGuidanceInterface::add(const int64_t id)
   RCLCPP_DEBUG(logger_, "Added creep guidance entry with id: %ld", id);
 }
 
+bool CreepGuidanceInterface::remove(const int64_t id)
+{
+  auto it = get_registered(id);
+  if (it != registerd_status_.statuses.end()) {
+    registerd_status_.statuses.erase(it);
+    RCLCPP_DEBUG(logger_, "Removed creep guidance entry with id: %ld", id);
+    return true;
+  }
+  RCLCPP_WARN(logger_, "Failed to remove: id %ld not found", id);
+  return false;
+}
+
 std::vector<CreepStatus>::iterator CreepGuidanceInterface::get_registered(const int64_t id)
 {
   return std::find_if(

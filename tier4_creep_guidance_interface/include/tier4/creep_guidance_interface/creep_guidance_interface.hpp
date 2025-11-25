@@ -67,6 +67,13 @@ public:
   void add(const int64_t id);
 
   /**
+   * @brief Remove a registered creep guidance status entry
+   * @param id Unique identifier for the creep guidance entry to remove
+   * @return True if the entry was found and removed, false otherwise
+   */
+  bool remove(const int64_t id);
+
+  /**
    * @brief Update the distance information for a registered entry
    * @param id Unique identifier for the creep guidance entry
    * @param start_distance Distance from the ego vehicle to the start point
